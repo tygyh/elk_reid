@@ -1,0 +1,7 @@
+pytest
+pytest-cov
+coverage
+numpy
+torch
+pillow
+segment-anything
