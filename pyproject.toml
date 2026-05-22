@@ -1,0 +1,9 @@
+[project]
+name = "animal-detector"
+version = "0.1.0"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
