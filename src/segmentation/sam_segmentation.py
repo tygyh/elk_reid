@@ -122,20 +122,50 @@ def save_masked_image(image, output_path):
     image.save(output_path)
 
 
-def segment_and_save_masks(image, predictor, output_dir, box=None):
-    masks = segment_image(image, predictor=predictor, box=box)
-    masked_images = apply_masks(image, masks)
+def segment_and_save_masks(
+    image,
+    predictor,
+    output_dir,
+    box=None,
+    multimask_output=True,
+    crop=False,
+    min_area=None,
+    output_format="png",
+):
+    masks = segment_image(
+        image,
+        predictor=predictor,
+        box=box,
+        multimask_output=multimask_output,
+    )
+
+    if min_area is not None:
+        masks = filter_masks(masks, min_area=min_area)
 
     paths = []
-    for index, masked_image in enumerate(masked_images):
-        output_path = output_dir / f"mask_{index}.png"
-        save_masked_image(masked_image, output_path)
+
+    for index, mask in enumerate(masks):
+        if crop:
+            output_image = crop_masked_region(image, mask)
+        else:
+            output_image = apply_mask(image, mask)
+
+        output_path = output_dir / f"mask_{index}.{output_format}"
+        save_masked_image(output_image, output_path)
         paths.append(output_path)
 
     return paths
 
 
-def segment_and_save_many_images(images, predictor, output_dir):
+def segment_and_save_many_images(
+    images,
+    predictor,
+    output_dir,
+    multimask_output=True,
+    crop=False,
+    min_area=None,
+    output_format="png",
+):
     all_paths = []
 
     for image_index, image in enumerate(images):
@@ -146,6 +176,10 @@ def segment_and_save_many_images(images, predictor, output_dir):
             image=image,
             predictor=predictor,
             output_dir=image_output_dir,
+            multimask_output=multimask_output,
+            crop=crop,
+            min_area=min_area,
+            output_format=output_format,
         )
 
         all_paths.append(paths)
@@ -189,3 +223,4 @@ def create_full_image_box(image):
     width, height = image.size
 
     return np.array([0, 0, width, height])
+

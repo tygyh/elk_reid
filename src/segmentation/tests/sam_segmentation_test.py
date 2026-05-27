@@ -431,3 +431,102 @@ def test_create_sam_predictor_rejects_missing_checkpoint(tmp_path):
             model_type="vit_b",
             device="cpu",
         )
+
+
+def test_segment_and_save_masks_crops_when_requested(
+        monkeypatch,
+        tmp_path,
+        image_a,
+        x_mask,
+):
+    called = {}
+
+    class FakePredictor:
+        def set_image(self, img_np):
+            pass
+
+        def predict(self, box, multimask_output):
+            return np.array([x_mask]), np.array([1.0]), np.array([x_mask])
+
+    def fake_crop_masked_region(image, mask):
+        called["crop"] = True
+        return image
+
+    monkeypatch.setattr(
+        "src.segmentation.sam_segmentation.crop_masked_region",
+        fake_crop_masked_region,
+    )
+
+    paths = segment_and_save_masks(
+        image=image_a,
+        predictor=FakePredictor(),
+        output_dir=tmp_path,
+        crop=True,
+    )
+
+    assert called["crop"] is True
+    assert paths == [tmp_path / "mask_0.png"]
+
+
+def test_segment_and_save_masks_filters_by_min_area(
+        tmp_path,
+        image_a,
+):
+    large_mask = np.array(
+        [
+            [True, True, False],
+            [True, True, False],
+            [False, False, False],
+        ],
+        dtype=bool,
+    )
+    small_mask = np.array(
+        [
+            [True, False, False],
+            [False, False, False],
+            [False, False, False],
+        ],
+        dtype=bool,
+    )
+
+    class FakePredictor:
+        def set_image(self, img_np):
+            pass
+
+        def predict(self, box, multimask_output):
+            masks = np.array([large_mask, small_mask])
+            scores = np.array([0.9, 0.8])
+            logits = masks.astype(float)
+            return masks, scores, logits
+
+    paths = segment_and_save_masks(
+        image=image_a,
+        predictor=FakePredictor(),
+        output_dir=tmp_path,
+        min_area=2,
+    )
+
+    assert paths == [tmp_path / "mask_0.png"]
+    assert paths[0].exists()
+
+
+def test_segment_and_save_masks_uses_output_format(tmp_path, image_a, x_mask):
+    class FakePredictor:
+        def set_image(self, img_np):
+            pass
+
+        def predict(self, box, multimask_output):
+            masks = np.array([x_mask])
+            scores = np.array([1.0])
+            logits = masks.astype(float)
+            return masks, scores, logits
+
+    paths = segment_and_save_masks(
+        image=image_a,
+        predictor=FakePredictor(),
+        output_dir=tmp_path,
+        output_format="jpg",
+    )
+
+    assert paths == [tmp_path / "mask_0.jpg"]
+    assert paths[0].exists()
